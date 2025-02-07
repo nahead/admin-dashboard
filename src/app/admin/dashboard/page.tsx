@@ -6,6 +6,13 @@ import Image from 'next/image';
 import React, { useEffect, useState } from 'react';
 import Swal from 'sweetalert2';
 
+interface ImageType {
+  asset: {
+    _ref: string;
+    _type: string;
+  };
+}
+
 interface Order {
   _id: string;
   firstname: string;
@@ -18,8 +25,9 @@ interface Order {
   totalPrice: number;
   orderDate: string;
   orderStatus: string | null;
-  cartItems: { name: string; image: any }[];
+  cartItems: { name: string; image: ImageType | null }[];
 }
+
 
 export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -45,7 +53,7 @@ export default function AdminDashboard() {
         }`
       )
       .then((data) => setOrders(data))
-      .catch((err) => console.error('Error fetching orders:', err));
+      .catch(() => console.error('Error fetching orders'));
   }, []);
 
   const filteredOrders =
@@ -71,7 +79,7 @@ export default function AdminDashboard() {
       await client.delete(orderId);
       setOrders((prevOrders) => prevOrders.filter((order) => order._id !== orderId));
       Swal.fire('Deleted!', 'The order has been deleted.', 'success');
-    } catch (error) {
+    } catch {
       Swal.fire('Error!', 'Something went wrong while deleting the order.', 'error');
     }
   };
@@ -83,7 +91,7 @@ export default function AdminDashboard() {
         prevOrders.map((order) => (order._id === orderId ? { ...order, orderStatus: newStatus } : order))
       );
       Swal.fire('Updated!', `Order status updated to ${newStatus}.`, 'success');
-    } catch (error) {
+    } catch {
       Swal.fire('Error!', 'Something went wrong while updating the status.', 'error');
     }
   };
