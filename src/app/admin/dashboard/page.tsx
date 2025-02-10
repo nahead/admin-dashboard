@@ -1,10 +1,21 @@
-'use client';
-import ProtectedRoute from '@/app/components/protectedRoute';
-import { client } from '@/sanity/lib/client';
-import { urlFor } from '@/sanity/lib/image';
-import Image from 'next/image';
-import React, { useEffect, useState } from 'react';
-import Swal from 'sweetalert2';
+"use client";
+import {
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import ProtectedRoute from "@/app/components/protectedRoute";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
+import { client } from "@/sanity/lib/client";
+import { urlFor } from "@/sanity/lib/image";
+import Image from "next/image";
+import React, { useEffect, useState } from "react";
+import Swal from "sweetalert2";
+import Link from "next/link";
+import { LogOut } from "lucide-react";
 
 interface ImageType {
   asset: {
@@ -28,11 +39,13 @@ interface Order {
   cartItems: { name: string; image: ImageType | null }[];
 }
 
-
 export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
-  const [filter, setFilter] = useState('All');
+  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  const [filter, setFilter] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ordersPerPage = 5;
 
   useEffect(() => {
     client
@@ -48,39 +61,51 @@ export default function AdminDashboard() {
           zipCode,
           totalPrice,
           orderDate,
-          orderStatus,   
+          orderStatus,
           cartItems[]->{name, image}
         }`
       )
       .then((data) => setOrders(data))
-      .catch(() => console.error('Error fetching orders'));
+      .catch(() => console.error("Error fetching orders"));
   }, []);
 
-  const filteredOrders =
-    filter === 'All' ? orders : orders.filter((order) => order.orderStatus === filter);
+  const filteredOrders = orders.filter((order) => {
+    const fullName = `${order.firstname} ${order.lastname}`.toLowerCase();
+    return (
+      (filter === "All" || order.orderStatus === filter) &&
+      fullName.includes(searchQuery.toLowerCase())
+    );
+  });
 
-  const toggleOrderDetail = (orderId: string) => {
-    setSelectedOrder((prev) => (prev === orderId ? null : orderId));
+  const indexOfLastOrder = currentPage * ordersPerPage;
+  const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
+  const currentOrders = filteredOrders.slice(
+    indexOfFirstOrder,
+    indexOfLastOrder
+  );
+
+  const handleRowClick = (order: Order) => {
+    setSelectedOrder(order);
   };
 
   const handleDelete = async (orderId: string) => {
     const result = await Swal.fire({
-      title: 'Are you sure you want to delete?',
-      text: "You won't be able to revert this!",
-      icon: 'warning',
+      title: "Are you sure you want to delete?",
+      text: "This action cannot be undone.",
+      icon: "warning",
       showCancelButton: true,
-      confirmButtonColor: '#3085d6',
-      cancelButtonColor: '#d33',
-      confirmButtonText: 'Yes, delete it!'
+      confirmButtonColor: "#3085d6",
+      cancelButtonColor: "#d33",
+      confirmButtonText: "Yes, delete it!",
     });
     if (!result.isConfirmed) return;
 
     try {
       await client.delete(orderId);
       setOrders((prevOrders) => prevOrders.filter((order) => order._id !== orderId));
-      Swal.fire('Deleted!', 'The order has been deleted.', 'success');
+      Swal.fire("Deleted!", "The order has been deleted.", "success");
     } catch {
-      Swal.fire('Error!', 'Something went wrong while deleting the order.', 'error');
+      Swal.fire("Error!", "Failed to delete the order.", "error");
     }
   };
 
@@ -88,125 +113,176 @@ export default function AdminDashboard() {
     try {
       await client.patch(orderId).set({ orderStatus: newStatus }).commit();
       setOrders((prevOrders) =>
-        prevOrders.map((order) => (order._id === orderId ? { ...order, orderStatus: newStatus } : order))
+        prevOrders.map((order) =>
+          order._id === orderId ? { ...order, orderStatus: newStatus } : order
+        )
       );
-      Swal.fire('Updated!', `Order status updated to ${newStatus}.`, 'success');
+      Swal.fire("Updated!", `Order status updated to ${newStatus}.`, "success");
     } catch {
-      Swal.fire('Error!', 'Something went wrong while updating the status.', 'error');
+      Swal.fire("Error!", "Failed to update the order status.", "error");
     }
   };
 
   return (
     <ProtectedRoute>
-      <div className="min-h-screen bg-gray-100 p-6">
-        <nav className="bg-blue-600 text-white p-4 shadow-lg rounded-xl flex justify-between mb-6">
-          <h2 className="text-2xl font-bold">Admin Dashboard</h2>
-          <div className="flex space-x-4">
-            {['All', 'pending', 'success', 'dispatch'].map((status) => (
-              <button
-                key={status}
-                className={`px-4 py-2 rounded-lg transition-all ${
-                  filter === status ? 'bg-white text-blue-600 font-bold' : 'text-white'
-                }`}
-                onClick={() => setFilter(status)}
-              >
-                {status.charAt(0).toUpperCase() + status.slice(1)}
-              </button>
-            ))}
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 sm:p-8">
+        <nav className="bg-blue-600 text-white p-6 rounded-xl shadow-xl mb-8">
+          <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+            <h2 className="text-2xl md:text-3xl font-bold md:font-extrabold">Admin Dashboard</h2>
+            <div className="flex flex-wrap  gap-4">
+              {"All pending success dispatch".split(" ").map((status) => (
+                <button
+                  key={status}
+                  className={`p-1 rounded-sm sm:px-4 sm:py-2 sm:rounded-lg sm:transition-all ${filter === status ? "bg-white text-blue-600 font-bold" : "text-white"
+                    } hover:bg-blue-700 hover:text-white`}
+                  onClick={() => setFilter(status)}
+                >
+                  {status.charAt(0).toUpperCase() + status.slice(1)}
+
+                </button>
+
+              ))}
+              <Link href={'/'} className='absolute sm:relative top-2 right-2   '> <LogOut /></Link>
+            </div>
           </div>
         </nav>
-        <div>
-          <h2 className="text-xl font-semibold mb-4">Orders</h2>
-          <div className="overflow-auto">
-            <table className="w-full bg-white shadow-md rounded-lg">
-              <thead>
-                <tr className="bg-gray-200 text-left">
-                  <th className="px-4 py-2 text-sm font-medium text-gray-700">Order ID</th>
-                  <th className="px-4 py-2 text-sm font-medium text-gray-700">Customer</th>
-                  <th className="px-4 py-2 text-sm font-medium text-gray-700">Address</th>
-                  <th className="px-4 py-2 text-sm font-medium text-gray-700">Date</th>
-                  <th className="px-4 py-2 text-sm font-medium text-gray-700">Total Amount</th>
-                  <th className="px-4 py-2 text-sm font-medium text-gray-700">Status</th>
-                  <th className="px-4 py-2 text-sm font-medium text-gray-700">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredOrders.map((order) => (
-                  <React.Fragment key={order._id}>
-                    <tr
-                      className="border-b cursor-pointer hover:bg-gray-100"
-                      onClick={() => toggleOrderDetail(order._id)}
-                    >
-                      <td className="px-4 py-2">{order._id}</td>
-                      <td className="px-4 py-2">
-                        {order.firstname} {order.lastname}
-                      </td>
-                      <td className="px-4 py-2">
-                        {order.address}, {order.city}
-                      </td>
-                      <td className="px-4 py-2">
-                        {new Date(order.orderDate).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-2">${order.totalPrice}</td>
-                      <td className="px-4 py-2">
-                        <select
-                          className="border rounded-lg px-2 py-1"
-                          value={order.orderStatus || ''}
-                          onChange={(e) => handleStatusChange(order._id, e.target.value)}
-                        >
-                          <option value="pending">Pending</option>
-                          <option value="success">Success</option>
-                          <option value="dispatch">Dispatched</option>
-                        </select>
-                      </td>
-                      <td className="px-4 py-2">
-                        <button
-                          className="bg-red-500 text-white px-3 py-1 rounded-lg hover:bg-red-600"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(order._id);
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                    {selectedOrder === order._id && (
-                      <tr className="bg-gray-50">
-                        <td colSpan={7} className="p-4">
-                          <h3 className="font-semibold mb-2">Cart Items:</h3>
-                          <p>Email: {order.email}</p>
-                          <p>Phone: {order.phone}</p>
-                          <p>
-                            Address: {order.address}, {order.city}
-                          </p>
-                          <ul>
-                            {order.cartItems.map((item, index) => (
-                              <li key={`${order._id}-${index}`} className="flex items-center space-x-4 mb-2">
-                                {item.image ? (
-                                  <Image
-                                    src={urlFor(item.image).url()}
-                                    alt={item.name}
-                                    width={50}
-                                    height={50}
-                                    className="rounded-lg"
-                                  />
-                                ) : (
-                                  <div>No Image</div>
-                                )}
-                                <span>{item.name}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </td>
-                      </tr>
-                    )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
+
+        <div className="flex justify-center mb-6">
+          <Input
+            placeholder="Search by customer name..."
+            className="w-full max-w-md px-4 py-2"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
         </div>
+
+        <div className="overflow-auto">
+          <table className="w-full bg-white shadow-md rounded-xl">
+            <thead>
+              <tr className="bg-gray-200">
+                <th className="px-6 py-4 text-sm font-bold text-gray-700">Order ID</th>
+                <th className="px-6 py-4 text-sm font-bold text-gray-700">Customer</th>
+                <th className="px-6 py-4 text-sm font-bold text-gray-700">Date</th>
+                <th className="px-6 py-4 text-sm font-bold text-gray-700">Amount</th>
+                <th className="px-6 py-4 text-sm font-bold text-gray-700">Status</th>
+                <th className="px-6 py-4 text-sm font-bold text-gray-700">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {currentOrders.map((order) => (
+                <tr
+                  key={order._id}
+                  className="border-b cursor-pointer hover:bg-gray-100"
+                  onClick={() => handleRowClick(order)}
+                >
+                  <td className="px-6 py-4">{order._id}</td>
+                  <td className="px-6 py-4">
+                    {order.firstname} {order.lastname}
+                  </td>
+                  <td className="px-6 py-4">
+                    {new Date(order.orderDate).toLocaleDateString()}
+                  </td>
+                  <td className="px-6 py-4">${order.totalPrice}</td>
+                  <td className="px-6 py-4">
+                    <Select
+                      value={order.orderStatus || ""}
+                      onValueChange={(newStatus) =>
+                        handleStatusChange(order._id, newStatus)
+                      }
+                    >
+                      <SelectTrigger className="border rounded-lg px-3 py-2 w-full">
+                        <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="pending">Pending</SelectItem>
+                        <SelectItem value="success">Success</SelectItem>
+                        <SelectItem value="dispatch">Dispatched</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </td>
+                  <td className="px-6 py-4">
+                    <Button
+                      variant="destructive"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDelete(order._id);
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="mt-6 flex justify-center items-center space-x-4">
+          <Button
+            onClick={() => setCurrentPage((prev) => Math.max(prev - 1, 1))}
+            disabled={currentPage === 1}
+          >
+            Previous
+          </Button>
+          <span className="mx-4">Page {currentPage}</span>
+          <Button
+            onClick={() =>
+              setCurrentPage((prev) =>
+                prev * ordersPerPage < filteredOrders.length ? prev + 1 : prev
+              )
+            }
+            disabled={currentPage * ordersPerPage >= filteredOrders.length}
+          >
+            Next
+          </Button>
+        </div>
+
+        {/* Modal for Order Details */}
+        {selectedOrder && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex justify-center items-center">
+            <div className="bg-white p-8 rounded-xl shadow-xl max-w-lg w-full">
+              <h3 className="text-2xl font-bold mb-4">
+                Order Details for {selectedOrder.firstname} {selectedOrder.lastname}
+              </h3>
+              <p>
+                <strong>Email:</strong> {selectedOrder.email}
+              </p>
+              <p>
+                <strong>Phone:</strong> {selectedOrder.phone}
+              </p>
+              <p>
+                <strong>Address:</strong> {selectedOrder.address}, {selectedOrder.city}
+              </p>
+              <p>
+                <strong>Total Price:</strong> ${selectedOrder.totalPrice}
+              </p>
+
+              {/* Dynamic Cart Items Section */}
+              <div className="my-4">
+                <h4 className="font-semibold">Cart Items:</h4>
+                {selectedOrder.cartItems.map((item, index) => (
+                  <div key={index} className="flex items-center mt-2">
+                    {item.image && (
+                      <Image
+                        src={urlFor(item.image.asset._ref).url()}
+                        alt={item.name}
+                        width={50}
+                        height={50}
+                        className="rounded-md mr-4"
+                      />
+                    )}
+                    <span>{item.name}</span>
+                  </div>
+                ))}
+              </div>
+
+              <Button className="mt-4" onClick={() => setSelectedOrder(null)}>
+                Close
+              </Button>
+            </div>
+          </div>
+        )}
+
       </div>
     </ProtectedRoute>
   );
