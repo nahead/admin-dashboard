@@ -36,7 +36,12 @@ interface Order {
   totalPrice: number;
   orderDate: string;
   orderStatus: string | null;
-  cartItems: { name: string; image: ImageType | null }[];
+  cartItems: {
+    product: any;
+    size: React.JSX.Element;
+    color: React.JSX.Element;
+    quantity: number; name: string; image: ImageType | null
+  }[];
 }
 
 export default function AdminDashboard() {
@@ -46,28 +51,37 @@ export default function AdminDashboard() {
   const [searchQuery, setSearchQuery] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const ordersPerPage = 5;
-
   useEffect(() => {
     client
       .fetch(
         `*[_type == "order"]{
-          _id,
-          firstname,
-          lastname,
-          email,
-          address,
-          city,
-          phone,
-          zipCode,
-          totalPrice,
-          orderDate,
-          orderStatus,
-          cartItems[]->{name, image}
-        }`
+  _id,
+  firstname,
+  lastname,
+  email,
+  address,
+  city,
+  phone,
+  zipCode,
+  totalPrice,
+  orderDate,
+  orderStatus,
+  cartItems[] {
+    product-> {
+      name,
+      image
+    },
+    size,
+    color,
+    quantity
+  }
+}
+`
       )
       .then((data) => setOrders(data))
       .catch(() => console.error("Error fetching orders"));
   }, []);
+
 
   const filteredOrders = orders.filter((order) => {
     const fullName = `${order.firstname} ${order.lastname}`.toLowerCase();
@@ -128,7 +142,7 @@ export default function AdminDashboard() {
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 sm:p-8">
         <nav className="bg-blue-600 text-white p-6 rounded-xl shadow-xl mb-8">
           <div className="flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-            <h2 className="text-2xl md:text-3xl font-bold md:font-extrabold">Admin Dashboard</h2>
+            <h2 className="text-xl md:text-3xl font-extrabold">Admin Dashboard</h2>
             <div className="flex flex-wrap  gap-4">
               {"All pending success dispatch".split(" ").map((status) => (
                 <button
@@ -142,7 +156,7 @@ export default function AdminDashboard() {
                 </button>
 
               ))}
-              <Link href={'/'} className='absolute sm:relative top-2 right-2   '> <LogOut /></Link>
+              <Link href={'/'} className='absolute top-2 right-2 sm:relative  '> <LogOut /></Link>
             </div>
           </div>
         </nav>
@@ -171,7 +185,7 @@ export default function AdminDashboard() {
             <tbody>
               {currentOrders.map((order) => (
                 <tr
-                  key={order._id}
+                  key={order._id} // Ensure this key is unique
                   className="border-b cursor-pointer hover:bg-gray-100"
                   onClick={() => handleRowClick(order)}
                 >
@@ -261,19 +275,32 @@ export default function AdminDashboard() {
               <div className="my-4">
                 <h4 className="font-semibold">Cart Items:</h4>
                 {selectedOrder.cartItems.map((item, index) => (
-                  <div key={index} className="flex items-center mt-2">
-                    {item.image && (
+                  <div key={`${item.product?.name}-${index}`} className="flex items-center mt-2">
+                    {item.product?.image ? (
                       <Image
-                        src={urlFor(item.image.asset._ref).url()}
-                        alt={item.name}
+                        src={urlFor(item.product.image).url()}
+                        alt={item.product?.name || "Product Image"}
                         width={50}
                         height={50}
                         className="rounded-md mr-4"
                       />
+                    ) : (
+                      <div className="w-12 h-12 bg-gray-200 rounded-md mr-4 flex items-center justify-center">
+                        <span>No Image</span>
+                      </div>
                     )}
-                    <span>{item.name}</span>
+
+                    <div>
+                      <p>{item.product?.name}</p>
+                      {item.size && <p>Size: {item.size}</p>}
+                      {item.color && <p>Color: {item.color}</p>}
+                      <p>Quantity: {item.quantity}</p>
+                    </div>
                   </div>
                 ))}
+
+
+
               </div>
 
               <Button className="mt-4" onClick={() => setSelectedOrder(null)}>
