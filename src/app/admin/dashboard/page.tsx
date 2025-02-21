@@ -37,7 +37,10 @@ interface Order {
   orderDate: string;
   orderStatus: string | null;
   cartItems: {
-    product:string ;
+    product: {
+      name: string;
+      image: ImageType | null;
+    };
     size: React.JSX.Element;
     color: React.JSX.Element;
     quantity: number; name: string; image: ImageType | null
